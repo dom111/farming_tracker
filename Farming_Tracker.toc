@@ -1,0 +1,10 @@
+## Interface: 110207
+## Title: Farming Tracker
+## Notes: Track materials obtained through farming
+## Author: Old Illusion
+## Version: 0.0.1
+## RequiredDeps:
+## X-Curse-Project-ID: 999999
+## SavedVariablesPerCharacter: FTDB
+
+Farming_Tracker.lua
