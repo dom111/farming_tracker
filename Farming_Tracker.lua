@@ -4,37 +4,28 @@ local addon = {}
 local pendingItems = {} -- Items waiting for server response
 
 -- Create main frame but don't show it yet
-local mainFrame = CreateFrame("Frame", "MyAddonMainFrame", UIParent, "BasicFrameTemplateWithInset")
-
-mainFrame:SetSize(250, 400)
+local mainFrame = CreateFrame("Frame", "MyAddonMainFrame", UIParent, "BackdropTemplate")
+mainFrame:SetSize(220, 300)
 mainFrame:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
-mainFrame.TitleBg:SetHeight(30)
 mainFrame:Hide()  -- Hide initially until addon loads
-mainFrame.title = mainFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-mainFrame.title:SetPoint("TOPLEFT", mainFrame.TitleBg, "TOPLEFT", 5, -4)
-mainFrame.title:SetText("Farming Tracker")
 
--- Create scrollable content area
-local scrollFrame = CreateFrame("ScrollFrame", "FarmingTrackerScrollFrame", mainFrame, "UIPanelScrollFrameTemplate")
-scrollFrame:SetPoint("TOPLEFT", mainFrame, "TOPLEFT", 15, -35)
-scrollFrame:SetPoint("BOTTOMRIGHT", mainFrame, "BOTTOMRIGHT", -35, 45)
+-- Set up backdrop with transparency
+mainFrame:SetBackdrop({
+    bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+    edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+    tile = true,
+    tileSize = 16,
+    edgeSize = 12,
+    insets = { left = 3, right = 3, top = 3, bottom = 3 }
+})
+mainFrame:SetBackdropColor(0, 0, 0, 0.85)
+mainFrame:SetBackdropBorderColor(0.4, 0.4, 0.4, 0.9)
 
-local contentFrame = CreateFrame("Frame", "FarmingTrackerContentFrame", scrollFrame)
-contentFrame:SetSize(200, 1) -- Height will be adjusted dynamically
-scrollFrame:SetScrollChild(contentFrame)
-
--- Input box and button
-local inputBox = CreateFrame("EditBox", "MaterialTrackerInputBox", mainFrame, "InputBoxTemplate")
-inputBox:SetSize(150, 30)
-inputBox:SetPoint("BOTTOMLEFT", mainFrame, "BOTTOMLEFT", 15, 10)
-inputBox:SetAutoFocus(false)
-inputBox:SetMaxLetters(10)
-
--- Add button
-local addButton = CreateFrame("Button", nil, mainFrame, "UIPanelButtonTemplate")
-addButton:SetSize(60, 30)
-addButton:SetPoint("LEFT", inputBox, "RIGHT", 10, 0)
-addButton:SetText("Add")
+-- Create content area (no scroll frame)
+local contentFrame = CreateFrame("Frame", "FarmingTrackerContentFrame", mainFrame)
+contentFrame:SetPoint("TOPLEFT", mainFrame, "TOPLEFT", 10, -10)
+contentFrame:SetPoint("TOPRIGHT", mainFrame, "TOPRIGHT", -10, -10)
+contentFrame:SetSize(200, 300) -- Set initial size
 
 mainFrame:EnableMouse(true)
 mainFrame:SetMovable(true)
@@ -48,13 +39,26 @@ end)
 
 SLASH_FARMINGTRACKER1 = "/farmingtracker"
 SLASH_FARMINGTRACKER2 = "/ft"
-SlashCmdList["FARMINGTRACKER"] = function()
-    if mainFrame:IsShown() then
-        mainFrame:Hide()
-        FTDB.visible = false
+SlashCmdList["FARMINGTRACKER"] = function(msg)
+    local command, arg = msg:match("^(%S*)%s*(.-)$")
+    command = command:lower()
+    
+    if command == "add" then
+        local itemID = tonumber(arg)
+        if itemID then
+            addon:AddItem(itemID)
+        else
+            print("Usage: /ft add <itemID>")
+        end
     else
-        mainFrame:Show()
-        FTDB.visible = true
+        -- Toggle window visibility
+        if mainFrame:IsShown() then
+            mainFrame:Hide()
+            FTDB.visible = false
+        else
+            mainFrame:Show()
+            FTDB.visible = true
+        end
     end
 end
 
@@ -135,42 +139,82 @@ function addon:HandleItemInfoReceived(itemID)
 end
 
 function addon:UpdateItemDisplay()
-    -- Clear existing display
+    -- Clear existing display - need to clear both frames and font strings
     for i, child in ipairs({contentFrame:GetChildren()}) do
         child:Hide()
         child:SetParent(nil)
     end
     
-    local yOffset = 0
-    local lineHeight = 20
-    
-    for itemID, itemData in pairs(FTDB.trackedItems) do
-        local itemCount = GetItemCount(tonumber(itemID))
-        
-        -- Create item display frame
-        local itemFrame = CreateFrame("Frame", nil, contentFrame)
-        itemFrame:SetSize(200, lineHeight)
-        itemFrame:SetPoint("TOPLEFT", contentFrame, "TOPLEFT", 0, -yOffset)
-        
-        -- Item name and count text
-        local itemText = itemFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        itemText:SetPoint("LEFT", itemFrame, "LEFT", 0, 0)
-        itemText:SetText(itemData.name .. ": " .. itemCount)
-        
-        -- Remove button
-        local removeBtn = CreateFrame("Button", nil, itemFrame, "UIPanelButtonTemplate")
-        removeBtn:SetSize(20, 18)
-        removeBtn:SetPoint("RIGHT", itemFrame, "RIGHT", 0, 0)
-        removeBtn:SetText("X")
-        removeBtn:SetScript("OnClick", function()
-            addon:RemoveItem(itemID)
-        end)
-        
-        yOffset = yOffset + lineHeight + 2
+    for i, region in ipairs({contentFrame:GetRegions()}) do
+        if region:GetObjectType() == "FontString" then
+            region:Hide()
+            region:SetParent(nil)
+        end
     end
     
-    -- Update content frame height
-    contentFrame:SetHeight(math.max(yOffset, 1))
+    local yOffset = 0
+    local lineHeight = 18
+    local itemCount = 0
+    
+    -- Count items first
+    for _ in pairs(FTDB.trackedItems) do
+        itemCount = itemCount + 1
+    end
+    
+    if itemCount == 0 then
+        -- Show empty state message
+        local emptyText = contentFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        emptyText:SetPoint("CENTER", mainFrame, "CENTER", 0, 0)
+        emptyText:SetText("|cff999999Alt-click items to track|r")
+        emptyText:SetFontObject("GameFontNormalSmall")
+        local font, size, flags = emptyText:GetFont()
+        emptyText:SetFont(font, size, "ITALIC")
+        
+        -- Set minimum size for empty state
+        mainFrame:SetSize(220, 50)
+    else
+        -- Display tracked items
+        for itemID, itemData in pairs(FTDB.trackedItems) do
+            local itemCount = GetItemCount(tonumber(itemID))
+            
+            -- Create item display frame
+            local itemFrame = CreateFrame("Frame", nil, contentFrame)
+            itemFrame:SetSize(200, lineHeight)
+            itemFrame:SetPoint("TOPLEFT", contentFrame, "TOPLEFT", 0, -yOffset)
+            
+            -- Item name and count text
+            local itemText = itemFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+            itemText:SetPoint("LEFT", itemFrame, "LEFT", 0, 0)
+            itemText:SetText(itemData.name .. ": |cffffffff" .. itemCount .. "|r")
+            itemText:SetJustifyH("LEFT")
+            itemText:SetWidth(165)
+            
+            -- Remove button (smaller, simpler)
+            local removeBtn = CreateFrame("Button", nil, itemFrame)
+            removeBtn:SetSize(20, 20)
+            removeBtn:SetPoint("RIGHT", itemFrame, "RIGHT", 0, 0)
+            
+            local removeBtnText = removeBtn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+            removeBtnText:SetPoint("CENTER")
+            removeBtnText:SetText("|cffff4444×|r")
+            
+            removeBtn:SetScript("OnEnter", function(self)
+                removeBtnText:SetText("|cffff0000×|r")
+            end)
+            removeBtn:SetScript("OnLeave", function(self)
+                removeBtnText:SetText("|cffff4444×|r")
+            end)
+            removeBtn:SetScript("OnClick", function()
+                addon:RemoveItem(itemID)
+            end)
+            
+            yOffset = yOffset + lineHeight + 1
+        end
+        
+        -- Resize main frame based on content (padding top and bottom)
+        local frameHeight = yOffset + 20
+        mainFrame:SetSize(220, frameHeight)
+    end
 end
 
 function addon:RemoveItem(itemID)
@@ -204,27 +248,23 @@ eventListenerFrame:RegisterEvent("GET_ITEM_INFO_RECEIVED")
 
 
 
--- Input box functionality
-addButton:SetScript("OnClick", function()
-    local itemID = inputBox:GetText()
-    if itemID and itemID ~= "" then
-        local numericID = tonumber(itemID)
-        if numericID then
-            addon:AddItem(numericID)
-            inputBox:SetText("") -- Clear input
-        else
-            print("Please enter a valid numeric item ID.")
+
+
+-- Inventory click integration
+-- Hook into the modified item click handler
+local originalHandleModifiedItemClick = HandleModifiedItemClick
+function HandleModifiedItemClick(link)
+    if IsAltKeyDown() and link then
+        -- Extract item ID from the link
+        local itemID = tonumber(link:match("item:(%d+)"))
+        if itemID then
+            addon:AddItem(itemID)
+            return -- Don't pass to original handler
         end
     end
-end)
+    
+    -- Call original function for other cases
+    return originalHandleModifiedItemClick(link)
+end
 
--- Allow Enter key to submit
-inputBox:SetScript("OnEnterPressed", function(self)
-    addButton:GetScript("OnClick")(addButton)
-    self:ClearFocus()
-end)
-
--- Clear focus when escape is pressed
-inputBox:SetScript("OnEscapePressed", function(self)
-    self:ClearFocus()
-end)
+print("|cff00ff00Farming Tracker loaded!|r Alt-click items to track them, or use /ft to toggle the window.")
