@@ -139,10 +139,17 @@ function addon:HandleItemInfoReceived(itemID)
 end
 
 function addon:UpdateItemDisplay()
-    -- Clear existing display
+    -- Clear existing display - need to clear both frames and font strings
     for i, child in ipairs({contentFrame:GetChildren()}) do
         child:Hide()
         child:SetParent(nil)
+    end
+    
+    for i, region in ipairs({contentFrame:GetRegions()}) do
+        if region:GetObjectType() == "FontString" then
+            region:Hide()
+            region:SetParent(nil)
+        end
     end
     
     local yOffset = 0
@@ -157,7 +164,7 @@ function addon:UpdateItemDisplay()
     if itemCount == 0 then
         -- Show empty state message
         local emptyText = contentFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        emptyText:SetPoint("CENTER", contentFrame, "TOP", 0, -20)
+        emptyText:SetPoint("CENTER", mainFrame, "CENTER", 0, 0)
         emptyText:SetText("|cff999999Alt-click items to track|r")
         emptyText:SetFontObject("GameFontNormalSmall")
         local font, size, flags = emptyText:GetFont()
