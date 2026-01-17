@@ -39,13 +39,26 @@ end)
 
 SLASH_FARMINGTRACKER1 = "/farmingtracker"
 SLASH_FARMINGTRACKER2 = "/ft"
-SlashCmdList["FARMINGTRACKER"] = function()
-    if mainFrame:IsShown() then
-        mainFrame:Hide()
-        FTDB.visible = false
+SlashCmdList["FARMINGTRACKER"] = function(msg)
+    local command, arg = msg:match("^(%S*)%s*(.-)$")
+    command = command:lower()
+    
+    if command == "add" then
+        local itemID = tonumber(arg)
+        if itemID then
+            addon:AddItem(itemID)
+        else
+            print("Usage: /ft add <itemID>")
+        end
     else
-        mainFrame:Show()
-        FTDB.visible = true
+        -- Toggle window visibility
+        if mainFrame:IsShown() then
+            mainFrame:Hide()
+            FTDB.visible = false
+        else
+            mainFrame:Show()
+            FTDB.visible = true
+        end
     end
 end
 
