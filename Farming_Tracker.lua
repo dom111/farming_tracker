@@ -232,9 +232,9 @@ function addon:UpdateItemDisplay()
                     local perSecond = rd.collected / elapsed
                     local perMinute = perSecond * 60
                     local perHour   = perSecond * 3600
-                    if perHour < 60 then
+                    if perHour < 20 then
                         rateStr = formatNumber(perHour) .. "/hr"
-                    elseif perMinute < 60 then
+                    elseif perMinute < 20 then
                         rateStr = formatNumber(perMinute) .. "/min"
                     else
                         rateStr = formatNumber(perSecond) .. "/sec"
