@@ -4,6 +4,16 @@ local addon = {}
 local pendingItems = {} -- Items waiting for server response
 local rateData = {}    -- In-memory rate tracking; resets every init/reload (never written to FTDB)
 
+-- Colour codes used throughout the display
+local COLOR_WHITE      = "|cffffffff"
+local COLOR_GREY_LIGHT = "|cff999999"
+local COLOR_GREY_MID   = "|cff888888"
+local COLOR_BLUE_LIGHT = "|cffadd8e6"
+local COLOR_RED        = "|cffff4444"
+local COLOR_RED_BRIGHT = "|cffff0000"
+local COLOR_GREEN      = "|cff00ff00"
+local COLOR_RESET      = "|r"
+
 -- Create main frame but don't show it yet
 local mainFrame = CreateFrame("Frame", "MyAddonMainFrame", UIParent, "BackdropTemplate")
 mainFrame:SetSize(220, 300)
@@ -297,7 +307,7 @@ function addon:UpdateItemDisplay()
         -- Show empty state message
         local emptyText = contentFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         emptyText:SetPoint("CENTER", mainFrame, "CENTER", 0, 0)
-        emptyText:SetText("|cff999999Alt-click items to track|r")
+        emptyText:SetText(COLOR_GREY_LIGHT .. "Alt-click items to track" .. COLOR_RESET)
         emptyText:SetFontObject("GameFontNormalSmall")
         local font, size, flags = emptyText:GetFont()
         emptyText:SetFont(font, size, "ITALIC")
@@ -338,8 +348,12 @@ function addon:UpdateItemDisplay()
             end
 
             -- Build item text: name, current count, and optional session count
-            local sessionStr = (FTDB.showSessionCount and rd and rd.collected > 0) and "|cffadd8e6(" .. rd.collected .. ")|r" or nil
-            local countText = "|cffffffff" .. currentCount .. "|r" .. (sessionStr and " " .. sessionStr or "")
+            local sessionStr = nil
+            if FTDB.showSessionCount and rd and rd.collected > 0 then
+                sessionStr = COLOR_BLUE_LIGHT .. "(" .. rd.collected .. ")" .. COLOR_RESET
+            end
+            local countText = COLOR_WHITE .. currentCount .. COLOR_RESET
+                .. (sessionStr and " " .. sessionStr or "")
 
             -- Create item display frame
             local itemFrame = CreateFrame("Frame", nil, contentFrame)
@@ -359,7 +373,7 @@ function addon:UpdateItemDisplay()
                 rateLabel:SetPoint("RIGHT", itemFrame, "RIGHT", -22, 0)
                 rateLabel:SetWidth(55)
                 rateLabel:SetJustifyH("RIGHT")
-                rateLabel:SetText("|cff888888" .. rateStr .. "|r")
+                rateLabel:SetText(COLOR_GREY_MID .. rateStr .. COLOR_RESET)
             end
 
             -- Remove button (smaller, simpler)
@@ -369,13 +383,13 @@ function addon:UpdateItemDisplay()
             
             local removeBtnText = removeBtn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
             removeBtnText:SetPoint("CENTER")
-            removeBtnText:SetText("|cffff4444×|r")
+            removeBtnText:SetText(COLOR_RED .. "×" .. COLOR_RESET)
             
             removeBtn:SetScript("OnEnter", function(self)
-                removeBtnText:SetText("|cffff0000×|r")
+                removeBtnText:SetText(COLOR_RED_BRIGHT .. "×" .. COLOR_RESET)
             end)
             removeBtn:SetScript("OnLeave", function(self)
-                removeBtnText:SetText("|cffff4444×|r")
+                removeBtnText:SetText(COLOR_RED .. "×" .. COLOR_RESET)
             end)
             removeBtn:SetScript("OnClick", function()
                 addon:RemoveItem(itemID)
@@ -441,4 +455,4 @@ function HandleModifiedItemClick(link)
     return originalHandleModifiedItemClick(link)
 end
 
-print("|cff00ff00Farming Tracker loaded!|r Alt-click items to track them, or use /ft to toggle the window.")
+print(COLOR_GREEN .. "Farming Tracker loaded!" .. COLOR_RESET .. " Alt-click items to track them, or use /ft to toggle the window.")
