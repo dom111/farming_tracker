@@ -2,6 +2,7 @@
 local addonName = "Farming_Tracker"
 local addon = {}
 local pendingItems = {} -- Items waiting for server response
+local rateData = {}    -- In-memory rate tracking; resets every init/reload (never written to FTDB)
 
 -- Create main frame but don't show it yet
 local mainFrame = CreateFrame("Frame", "MyAddonMainFrame", UIParent, "BackdropTemplate")
@@ -62,6 +63,15 @@ SlashCmdList["FARMINGTRACKER"] = function(msg)
     end
 end
 
+-- Format a number to at most 1 decimal place, omitting a trailing ".0"
+local function formatNumber(n)
+    local rounded = math.floor(n * 10 + 0.5) / 10
+    if rounded == math.floor(rounded) then
+        return tostring(math.floor(rounded))
+    end
+    return tostring(rounded)
+end
+
 -- Addon loading and event handling
 function addon:OnAddonLoaded(loadedAddonName)
     if loadedAddonName ~= addonName then
@@ -90,6 +100,11 @@ function addon:OnAddonLoaded(loadedAddonName)
     
     -- Update display
     addon:UpdateItemDisplay()
+
+    -- Start live-refresh ticker (~5 s) so rates stay current between bag events
+    C_Timer.NewTicker(5, function()
+        addon:UpdateItemDisplay()
+    end)
 end
 
 -- Item tracking functions
@@ -138,7 +153,38 @@ function addon:HandleItemInfoReceived(itemID)
     end
 end
 
+-- Update per-item rate tracking state (in-memory only, never touches FTDB)
+function addon:UpdateRates()
+    if not FTDB or not FTDB.trackedItems then return end
+
+    for itemID, _ in pairs(FTDB.trackedItems) do
+        local id = tonumber(itemID)
+        local currentCount = GetItemCount(id)
+
+        if not rateData[itemID] then
+            -- Seed baseline so existing bag contents are NOT counted as a gain
+            rateData[itemID] = { lastCount = currentCount, collected = 0, startTime = nil }
+        else
+            local data = rateData[itemID]
+            local delta = currentCount - data.lastCount
+
+            if delta > 0 then
+                if not data.startTime then
+                    data.startTime = GetTime()
+                end
+                data.collected = data.collected + delta
+                data.lastCount = currentCount
+            elseif delta < 0 then
+                -- Item was sold/used: update baseline but never reduce collected
+                data.lastCount = currentCount
+            end
+        end
+    end
+end
+
 function addon:UpdateItemDisplay()
+    self:UpdateRates()
+
     -- Clear existing display - need to clear both frames and font strings
     for i, child in ipairs({contentFrame:GetChildren()}) do
         child:Hide()
@@ -175,20 +221,48 @@ function addon:UpdateItemDisplay()
     else
         -- Display tracked items
         for itemID, itemData in pairs(FTDB.trackedItems) do
-            local itemCount = GetItemCount(tonumber(itemID))
-            
+            local currentCount = GetItemCount(tonumber(itemID))
+
+            -- Build rate string if this item has gained anything since init
+            local rateStr = nil
+            local rd = rateData[itemID]
+            if rd and rd.collected > 0 and rd.startTime then
+                local elapsed = GetTime() - rd.startTime
+                if elapsed > 0 then
+                    local perSecond = rd.collected / elapsed
+                    local perMinute = perSecond * 60
+                    local perHour   = perSecond * 3600
+                    if perHour < 60 then
+                        rateStr = formatNumber(perHour) .. "/hr"
+                    elseif perMinute < 60 then
+                        rateStr = formatNumber(perMinute) .. "/min"
+                    else
+                        rateStr = formatNumber(perSecond) .. "/sec"
+                    end
+                end
+            end
+
             -- Create item display frame
             local itemFrame = CreateFrame("Frame", nil, contentFrame)
             itemFrame:SetSize(200, lineHeight)
             itemFrame:SetPoint("TOPLEFT", contentFrame, "TOPLEFT", 0, -yOffset)
             
-            -- Item name and count text
+            -- Item name and count text; narrowed slightly when a rate label is present
             local itemText = itemFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
             itemText:SetPoint("LEFT", itemFrame, "LEFT", 0, 0)
-            itemText:SetText(itemData.name .. ": |cffffffff" .. itemCount .. "|r")
+            itemText:SetText(itemData.name .. ": |cffffffff" .. currentCount .. "|r")
             itemText:SetJustifyH("LEFT")
-            itemText:SetWidth(165)
-            
+            itemText:SetWidth(rateStr and 130 or 165)
+
+            -- Rate label (right-aligned, mid-grey, left of the × button)
+            if rateStr then
+                local rateLabel = itemFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+                rateLabel:SetPoint("RIGHT", itemFrame, "RIGHT", -22, 0)
+                rateLabel:SetWidth(55)
+                rateLabel:SetJustifyH("RIGHT")
+                rateLabel:SetText("|cff888888" .. rateStr .. "|r")
+            end
+
             -- Remove button (smaller, simpler)
             local removeBtn = CreateFrame("Button", nil, itemFrame)
             removeBtn:SetSize(20, 20)
@@ -221,6 +295,7 @@ function addon:RemoveItem(itemID)
     if FTDB.trackedItems[itemID] then
         local itemName = FTDB.trackedItems[itemID].name
         FTDB.trackedItems[itemID] = nil
+        rateData[itemID] = nil  -- clear in-memory rate state for this item
         print("Removed '" .. itemName .. "' from tracking list.")
         self:UpdateItemDisplay()
     end
