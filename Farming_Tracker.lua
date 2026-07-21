@@ -338,12 +338,8 @@ function addon:UpdateItemDisplay()
             end
 
             -- Build item text: name, current count, and optional session count
-            local sessionStr = nil
-            if FTDB.showSessionCount and rd and rd.collected > 0 then
-                sessionStr = "|cffadd8e6(" .. rd.collected .. ")|r"
-            end
-            local countText = "|cffffffff" .. currentCount .. "|r"
-                .. (sessionStr and " " .. sessionStr or "")
+            local sessionStr = (FTDB.showSessionCount and rd and rd.collected > 0) and "|cffadd8e6(" .. rd.collected .. ")|r" or nil
+            local countText = "|cffffffff" .. currentCount .. "|r" .. (sessionStr and " " .. sessionStr or "")
 
             -- Create item display frame
             local itemFrame = CreateFrame("Frame", nil, contentFrame)
