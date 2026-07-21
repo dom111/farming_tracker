@@ -329,19 +329,22 @@ function addon:UpdateItemDisplay()
                     local perMinute = perSecond * 60
                     local perHour   = perSecond * 3600
                     local unit = FTDB.rateUnit or "auto"
-                    if unit == "hour" then
-                        rateStr = formatNumber(perHour) .. "/hr"
-                    elseif unit == "min" then
-                        rateStr = formatNumber(perMinute) .. "/min"
-                    elseif unit == "sec" then
-                        rateStr = formatNumber(perSecond) .. "/sec"
-                    else -- auto: < 10/min → /hr; 10–59/min → /min; ≥ 60/min → /sec
-                        if perMinute < 10 then
+
+                    if perHour > 1 then
+                        if unit == "hour" then
                             rateStr = formatNumber(perHour) .. "/hr"
-                        elseif perMinute < 60 then
+                        elseif unit == "min" then
                             rateStr = formatNumber(perMinute) .. "/min"
-                        else
+                        elseif unit == "sec" then
                             rateStr = formatNumber(perSecond) .. "/sec"
+                        else -- auto: < 10/min → /hr; 10–59/min → /min; ≥ 60/min → /sec
+                            if perMinute < 10 then
+                                rateStr = formatNumber(perHour) .. "/hr"
+                            elseif perMinute < 60 then
+                                rateStr = formatNumber(perMinute) .. "/min"
+                            else
+                                rateStr = formatNumber(perSecond) .. "/sec"
+                            end
                         end
                     end
                 end
