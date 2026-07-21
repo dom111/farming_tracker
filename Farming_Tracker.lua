@@ -102,6 +102,9 @@ function addon:OnAddonLoaded(loadedAddonName)
     if not FTDB.rateUnit then
         FTDB.rateUnit = "auto"
     end
+    if FTDB.showSessionCount == nil then
+        FTDB.showSessionCount = true
+    end
     
     -- Restore saved frame position, or default to centre
     if FTDB.position and FTDB.position.point and FTDB.position.relativePoint
@@ -170,6 +173,21 @@ function addon:RegisterSettings()
         container:Add("sec",  "Per Second (/sec)")
         return container:GetData()
     end, "Which unit to use when displaying the collection rate")
+
+    -- "Show Session Count" checkbox
+    local showSessionCountSetting = Settings.RegisterProxySetting(
+        category,
+        "FARMING_TRACKER_SHOW_SESSION_COUNT",
+        Settings.VarType.Boolean,
+        "Show Session Count",
+        true,
+        function() return FTDB.showSessionCount end,
+        function(value)
+            FTDB.showSessionCount = value
+            addon:UpdateItemDisplay()
+        end
+    )
+    Settings.CreateCheckbox(category, showSessionCountSetting, "Show items collected this session next to the current count")
 
     Settings.RegisterAddOnCategory(category)
 end
@@ -319,6 +337,14 @@ function addon:UpdateItemDisplay()
                 end
             end
 
+            -- Build item text: name, current count, and optional session count
+            local sessionStr = nil
+            if FTDB.showSessionCount and rd and rd.collected > 0 then
+                sessionStr = "|cffadd8e6(" .. rd.collected .. ")|r"
+            end
+            local countText = "|cffffffff" .. currentCount .. "|r"
+                .. (sessionStr and " " .. sessionStr or "")
+
             -- Create item display frame
             local itemFrame = CreateFrame("Frame", nil, contentFrame)
             itemFrame:SetSize(200, lineHeight)
@@ -327,7 +353,7 @@ function addon:UpdateItemDisplay()
             -- Item name and count text; narrowed slightly when a rate label is present
             local itemText = itemFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
             itemText:SetPoint("LEFT", itemFrame, "LEFT", 0, 0)
-            itemText:SetText(itemData.name .. ": |cffffffff" .. currentCount .. "|r")
+            itemText:SetText(itemData.name .. ": " .. countText)
             itemText:SetJustifyH("LEFT")
             itemText:SetWidth(rateStr and 130 or 165)
 
