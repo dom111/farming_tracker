@@ -36,6 +36,9 @@ mainFrame:SetScript("OnDragStart", function(self)
 end)
 mainFrame:SetScript("OnDragStop", function(self)
 	self:StopMovingOrSizing()
+	-- Persist position relative to UIParent so it survives reload/relog
+	local point, _, relativePoint, x, y = self:GetPoint()
+	FTDB.position = { point = point, relativePoint = relativePoint, x = x, y = y }
 end)
 
 SLASH_FARMINGTRACKER1 = "/farmingtracker"
@@ -99,6 +102,13 @@ function addon:OnAddonLoaded(loadedAddonName)
         FTDB.rateUnit = "auto"
     end
     
+    -- Restore saved frame position, or default to centre
+    if FTDB.position then
+        local p = FTDB.position
+        mainFrame:ClearAllPoints()
+        mainFrame:SetPoint(p.point, UIParent, p.relativePoint, p.x, p.y)
+    end
+
     -- Set initial frame visibility based on saved setting
     if FTDB.visible then
         mainFrame:Show()
