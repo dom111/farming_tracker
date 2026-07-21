@@ -44,6 +44,7 @@ end)
 SLASH_FARMINGTRACKER1 = "/farmingtracker"
 SLASH_FARMINGTRACKER2 = "/ft"
 SlashCmdList["FARMINGTRACKER"] = function(msg)
+    if not FTDB then return end  -- safety: ADDON_LOADED hasn't fired yet
     local command, arg = msg:match("^(%S*)%s*(.-)$")
     command = command:lower()
     
@@ -103,7 +104,8 @@ function addon:OnAddonLoaded(loadedAddonName)
     end
     
     -- Restore saved frame position, or default to centre
-    if FTDB.position then
+    if FTDB.position and FTDB.position.point and FTDB.position.relativePoint
+       and FTDB.position.x ~= nil and FTDB.position.y ~= nil then
         local p = FTDB.position
         mainFrame:ClearAllPoints()
         mainFrame:SetPoint(p.point, UIParent, p.relativePoint, p.x, p.y)
@@ -250,6 +252,7 @@ function addon:UpdateRates()
 end
 
 function addon:UpdateItemDisplay()
+    if not FTDB or not FTDB.trackedItems then return end
     self:UpdateRates()
 
     -- Clear existing display - need to clear both frames and font strings
