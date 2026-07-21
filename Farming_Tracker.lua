@@ -307,8 +307,8 @@ function addon:UpdateItemDisplay()
                         rateStr = formatNumber(perMinute) .. "/min"
                     elseif unit == "sec" then
                         rateStr = formatNumber(perSecond) .. "/sec"
-                    else -- auto: /hr only for truly low rates (< 10/hr); /min for most; /sec for very high rates
-                        if perHour < 10 then
+                    else -- auto: < 10/min → /hr; 10–59/min → /min; ≥ 60/min → /sec
+                        if perMinute < 10 then
                             rateStr = formatNumber(perHour) .. "/hr"
                         elseif perMinute < 60 then
                             rateStr = formatNumber(perMinute) .. "/min"
