@@ -138,7 +138,6 @@ function addon:RegisterSettings()
     local showRateSetting = Settings.RegisterProxySetting(
         category,
         "FARMING_TRACKER_SHOW_RATE",
-        Settings.DefaultVarLocation,
         Settings.VarType.Boolean,
         "Show Rate",
         true,
@@ -154,7 +153,6 @@ function addon:RegisterSettings()
     local rateUnitSetting = Settings.RegisterProxySetting(
         category,
         "FARMING_TRACKER_RATE_UNIT",
-        Settings.DefaultVarLocation,
         Settings.VarType.String,
         "Rate Unit",
         "auto",
