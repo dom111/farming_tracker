@@ -44,7 +44,7 @@ end)
 SLASH_FARMINGTRACKER1 = "/farmingtracker"
 SLASH_FARMINGTRACKER2 = "/ft"
 SlashCmdList["FARMINGTRACKER"] = function(msg)
-    if not FTDB then return end  -- safety: ADDON_LOADED hasn't fired yet
+    if not FTDB then return end  -- guard against nil FTDB on first load
     local command, arg = msg:match("^(%S*)%s*(.-)$")
     command = command:lower()
     
