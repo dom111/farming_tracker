@@ -90,6 +90,14 @@ function addon:OnAddonLoaded(loadedAddonName)
     if not FTDB.trackedItems then
         FTDB.trackedItems = {}
     end
+
+    -- Ensure rate settings have defaults (for upgrades from older versions)
+    if FTDB.showRate == nil then
+        FTDB.showRate = true
+    end
+    if not FTDB.rateUnit then
+        FTDB.rateUnit = "auto"
+    end
     
     -- Set initial frame visibility based on saved setting
     if FTDB.visible then
@@ -97,7 +105,10 @@ function addon:OnAddonLoaded(loadedAddonName)
     else
         mainFrame:Hide()
     end
-    
+
+    -- Register Addon Options panel
+    addon:RegisterSettings()
+
     -- Update display
     addon:UpdateItemDisplay()
 
@@ -105,6 +116,52 @@ function addon:OnAddonLoaded(loadedAddonName)
     C_Timer.NewTicker(5, function()
         addon:UpdateItemDisplay()
     end)
+end
+
+-- Register the Addon Options panel (Settings > Addons > Farming Tracker)
+function addon:RegisterSettings()
+    local category, layout = Settings.RegisterVerticalLayoutCategory("Farming Tracker")
+
+    -- "Show Rate" checkbox
+    local showRateSetting = Settings.RegisterProxySetting(
+        category,
+        "FARMING_TRACKER_SHOW_RATE",
+        Settings.DefaultVarLocation,
+        Settings.VarType.Boolean,
+        "Show Rate",
+        true,
+        function() return FTDB.showRate end,
+        function(value)
+            FTDB.showRate = value
+            addon:UpdateItemDisplay()
+        end
+    )
+    Settings.CreateCheckbox(category, showRateSetting, "Display collection rate next to item counts")
+
+    -- "Rate Unit" dropdown
+    local rateUnitSetting = Settings.RegisterProxySetting(
+        category,
+        "FARMING_TRACKER_RATE_UNIT",
+        Settings.DefaultVarLocation,
+        Settings.VarType.String,
+        "Rate Unit",
+        "auto",
+        function() return FTDB.rateUnit end,
+        function(value)
+            FTDB.rateUnit = value
+            addon:UpdateItemDisplay()
+        end
+    )
+    Settings.CreateDropdown(category, rateUnitSetting, function()
+        local container = Settings.CreateControlTextContainer()
+        container:Add("auto", "Auto")
+        container:Add("hour", "Per Hour (/hr)")
+        container:Add("min",  "Per Minute (/min)")
+        container:Add("sec",  "Per Second (/sec)")
+        return container:GetData()
+    end, "Which unit to use when displaying the collection rate")
+
+    Settings.RegisterAddOnCategory(category)
 end
 
 -- Item tracking functions
@@ -223,21 +280,30 @@ function addon:UpdateItemDisplay()
         for itemID, itemData in pairs(FTDB.trackedItems) do
             local currentCount = GetItemCount(tonumber(itemID))
 
-            -- Build rate string if this item has gained anything since init
+            -- Build rate string if rates are enabled and this item has gained anything since init
             local rateStr = nil
             local rd = rateData[itemID]
-            if rd and rd.collected > 0 and rd.startTime then
+            if FTDB.showRate and rd and rd.collected > 0 and rd.startTime then
                 local elapsed = GetTime() - rd.startTime
                 if elapsed > 0 then
                     local perSecond = rd.collected / elapsed
                     local perMinute = perSecond * 60
                     local perHour   = perSecond * 3600
-                    if perHour < 20 then
+                    local unit = FTDB.rateUnit or "auto"
+                    if unit == "hour" then
                         rateStr = formatNumber(perHour) .. "/hr"
-                    elseif perMinute < 20 then
+                    elseif unit == "min" then
                         rateStr = formatNumber(perMinute) .. "/min"
-                    else
+                    elseif unit == "sec" then
                         rateStr = formatNumber(perSecond) .. "/sec"
+                    else -- auto: pick the largest unit whose value stays below 60
+                        if perHour < 60 then
+                            rateStr = formatNumber(perHour) .. "/hr"
+                        elseif perMinute < 60 then
+                            rateStr = formatNumber(perMinute) .. "/min"
+                        else
+                            rateStr = formatNumber(perSecond) .. "/sec"
+                        end
                     end
                 end
             end
