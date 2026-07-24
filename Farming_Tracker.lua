@@ -42,13 +42,13 @@ mainFrame:EnableMouse(true)
 mainFrame:SetMovable(true)
 mainFrame:RegisterForDrag("LeftButton")
 mainFrame:SetScript("OnDragStart", function(self)
-	self:StartMoving()
+    self:StartMoving()
 end)
 mainFrame:SetScript("OnDragStop", function(self)
-	self:StopMovingOrSizing()
-	-- Persist position relative to UIParent so it survives reload/relog
-	local point, _, relativePoint, x, y = self:GetPoint()
-	FTDB.position = { point = point, relativePoint = relativePoint, x = x, y = y }
+    self:StopMovingOrSizing()
+    -- Persist position relative to UIParent so it survives reload/relog
+    local point, _, relativePoint, x, y = self:GetPoint()
+    FTDB.position = { point = point, relativePoint = relativePoint, x = x, y = y }
 end)
 
 SLASH_FARMINGTRACKER1 = "/farmingtracker"
@@ -257,20 +257,29 @@ function addon:UpdateRates()
         local currentCount = GetItemCount(id)
 
         if not rateData[itemID] then
-            -- Seed baseline so existing bag contents are NOT counted as a gain
-            rateData[itemID] = { lastCount = currentCount, collected = 0, startTime = nil }
+            -- ONLY seed baseline if the API has actually loaded item data (currentCount > 0)
+            -- If currentCount is 0, leave rateData[itemID] uninitialized until bags load!
+            if currentCount > 0 then
+                rateData[itemID] = { 
+                    lastCount = currentCount, 
+                    collected = 0, 
+                    startTime = nil,
+                    initialized = true 
+                }
+            end
         else
             local data = rateData[itemID]
             local delta = currentCount - data.lastCount
 
             if delta > 0 then
+                -- Standard gain logic
                 if not data.startTime then
                     data.startTime = GetTime()
                 end
                 data.collected = data.collected + delta
                 data.lastCount = currentCount
             elseif delta < 0 then
-                -- Item was sold/used: update baseline but never reduce collected
+                -- Item consumed or moved
                 data.lastCount = currentCount
             end
         end
@@ -329,22 +338,19 @@ function addon:UpdateItemDisplay()
                     local perMinute = perSecond * 60
                     local perHour   = perSecond * 3600
                     local unit = FTDB.rateUnit or "auto"
-
-                    if perHour > 1 then
-                        if unit == "hour" then
+                    if unit == "hour" then
+                        rateStr = formatNumber(perHour) .. "/hr"
+                    elseif unit == "min" then
+                        rateStr = formatNumber(perMinute) .. "/min"
+                    elseif unit == "sec" then
+                        rateStr = formatNumber(perSecond) .. "/sec"
+                    else -- auto: < 10/min → /hr; 10–59/min → /min; ≥ 60/min → /sec
+                        if perMinute < 10 then
                             rateStr = formatNumber(perHour) .. "/hr"
-                        elseif unit == "min" then
+                        elseif perMinute < 60 then
                             rateStr = formatNumber(perMinute) .. "/min"
-                        elseif unit == "sec" then
+                        else
                             rateStr = formatNumber(perSecond) .. "/sec"
-                        else -- auto: < 10/min → /hr; 10–59/min → /min; ≥ 60/min → /sec
-                            if perMinute < 10 then
-                                rateStr = formatNumber(perHour) .. "/hr"
-                            elseif perMinute < 60 then
-                                rateStr = formatNumber(perMinute) .. "/min"
-                            else
-                                rateStr = formatNumber(perSecond) .. "/sec"
-                            end
                         end
                     end
                 end
@@ -436,10 +442,6 @@ eventListenerFrame:RegisterEvent("ADDON_LOADED")
 eventListenerFrame:RegisterEvent("ITEM_COUNT_CHANGED")
 eventListenerFrame:RegisterEvent("BAG_UPDATE_DELAYED")
 eventListenerFrame:RegisterEvent("GET_ITEM_INFO_RECEIVED")
-
-
-
-
 
 -- Inventory click integration
 -- Hook into the modified item click handler
